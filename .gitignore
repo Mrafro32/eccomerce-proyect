@@ -1,0 +1,23 @@
+#Seguridad y credenciales
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+*.cert
+*credentials*
+*secret*
+# Dependencias de entorno
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+#Archivos de sistema
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+*.swp
+*.swo
