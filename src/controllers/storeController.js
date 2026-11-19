@@ -1,6 +1,6 @@
 const redis = require('../config/redisClient');
 
-//seccion 1 operaciones crud sobre el carrito usando hashes
+//operaciones crud sobre el carrito usando hashes
 
 //crear o actualizar un producto dentro del carrito del usuario
 exports.addItemToCart = async (req, res) => {
@@ -101,7 +101,7 @@ exports.clearCart = async (req, res) => {
   }
 };
 
-//seccion 2 consultas especializadas con ttl y conjuntos ordenados
+//consultas especializadas con ttl y conjuntos ordenados
 
 //crear una sesion temporal de usuario con autodestruccion por tiempo
 exports.createSession = async (req, res) => {

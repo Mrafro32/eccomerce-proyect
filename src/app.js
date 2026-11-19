@@ -4,6 +4,7 @@ const storeRoutes = require('./routes/storeRoutes');
 
 const app = express();
 app.use(express.json());
+app.use(express.static('public'));
 
 //rutas de la api
 app.use('/api', storeRoutes);
