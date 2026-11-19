@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Redis E-Commerce Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans">
+  <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-10">
+    <div class="max-w-6xl mx-auto px-4 py-4 flex flex-wrap items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <span class="px-2.5 py-1 rounded bg-rose-600 text-xs font-bold tracking-wider uppercase">Redis Cloud</span>
+        <h1 class="text-xl font-bold tracking-tight">E-Commerce &amp; Live Analytics</h1>
+      </div>
+      <div class="flex items-center gap-2 text-sm">
+        <label for="userIdInput" class="text-slate-400">Usuario activo:</label>
+        <input id="userIdInput" type="text" value="user1"
+          class="bg-slate-800 border border-slate-700 rounded px-2.5 py-1 text-slate-100 w-28 focus:outline-none focus:border-rose-500" />
+        <button onclick="refreshAll()"
+          class="bg-slate-800 hover:bg-slate-700 border border-slate-700 px-3 py-1 rounded text-xs font-medium transition">
+          Refrescar todo
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- COLUMNA 1: CATÁLOGO Y CARRITO (HASH + TTL) -->
+    <section class="lg:col-span-2 space-y-6">
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-5">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-lg font-semibold">Catálogo Rápido <span class="text-xs text-slate-400 font-normal">(POST /api/cart/:userId)</span></h2>
+          <span class="text-xs text-emerald-400 bg-emerald-950/60 border border-emerald-800/60 px-2 py-0.5 rounded">HSET + ZINCRBY</span>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3" id="catalogGrid"></div>
+      </div>
+
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-5">
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+          <div>
+            <h2 class="text-lg font-semibold">Carrito en Memoria <span class="text-xs text-slate-400 font-normal">(Hash: cart:<span id="cartUserLabel">user1</span>)</span></h2>
+            <p class="text-xs text-slate-400 mt-0.5">TTL restante: <span id="cartTtl" class="text-amber-400 font-mono font-semibold">--</span></p>
+          </div>
+          <button onclick="clearCart()"
+            class="bg-rose-950/70 hover:bg-rose-900 text-rose-300 border border-rose-800/60 px-3 py-1.5 rounded-lg text-xs font-medium transition">
+            Vaciar Carrito (DEL)
+          </button>
+        </div>
+
+        <div id="cartItems" class="divide-y divide-slate-800 text-sm">
+          <p class="text-slate-500 py-4 text-center">Cargando carrito...</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- COLUMNA 2: RANKING (SORTED SET) Y SESIÓN (SETEX + TTL) -->
+    <aside class="space-y-6">
+      <!-- RANKING -->
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-5">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-lg font-semibold">Top Productos</h2>
+          <span class="text-xs text-sky-400 bg-sky-950/60 border border-sky-800/60 px-2 py-0.5 rounded">Sorted Set</span>
+        </div>
+        <ol id="rankingList" class="space-y-2.5 text-sm">
+          <li class="text-slate-500">Cargando ranking...</li>
+        </ol>
+      </div>
+
+      <!-- SESIONES TEMPORALES -->
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
+        <div class="flex items-center justify-between">
+          <h2 class="text-lg font-semibold">Sesión Temporal</h2>
+          <span class="text-xs text-purple-400 bg-purple-950/60 border border-purple-800/60 px-2 py-0.5 rounded">SETEX + TTL</span>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2 text-xs">
+          <div>
+            <label class="block text-slate-400 mb-1">Token</label>
+            <input id="sessionToken" type="text" value="token_abc123"
+              class="w-full bg-slate-800 border border-slate-700 rounded px-2.5 py-1.5 text-slate-100 font-mono" />
+          </div>
+          <div>
+            <label class="block text-slate-400 mb-1">TTL (segundos)</label>
+            <input id="sessionTtl" type="number" value="25" min="5" max="3600"
+              class="w-full bg-slate-800 border border-slate-700 rounded px-2.5 py-1.5 text-slate-100 font-mono" />
+          </div>
+        </div>
+
+        <div class="flex gap-2">
+          <button onclick="createSession()"
+            class="flex-1 bg-purple-600 hover:bg-purple-500 text-white font-medium py-2 px-3 rounded-lg text-xs transition">
+            Crear Sesión (POST)
+          </button>
+          <button onclick="checkSession()"
+            class="flex-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-medium py-2 px-3 rounded-lg text-xs transition">
+            Verificar (GET)
+          </button>
+        </div>
+
+        <div id="sessionStatus" class="bg-slate-950 border border-slate-800 rounded-lg p-3 text-xs font-mono text-slate-300">
+          Sin verificar aún.
+        </div>
+      </div>
+
+      <!-- LOG DE RESPUESTAS API -->
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Última respuesta JSON</span>
+          <span id="httpBadge" class="text-[11px] font-mono text-slate-400">--</span>
+        </div>
+        <pre id="apiLog" class="bg-slate-950 border border-slate-800 rounded p-2.5 text-[11px] text-emerald-400 overflow-x-auto max-h-40">{}</pre>
+      </div>
+    </aside>
+  </main>
+
+  <script>
+    const PRODUCTS = [
+      { name: "Monitor de 144Hz", price: "$4,500 MXN", tag: "Periféricos" },
+      { name: "Teclado Mecánico RGB", price: "$1,450 MXN", tag: "Periféricos" },
+      { name: "Mouse Inalámbrico Pro", price: "$1,100 MXN", tag: "Accesorios" },
+      { name: "SSD NVMe 1TB", price: "$1,690 MXN", tag: "Almacenamiento" }
+    ];
+
+    let sessionPollTimer = null;
+
+    function getUserId() {
+      const val = document.getElementById("userIdInput").value.trim() || "user1";
+      document.getElementById("cartUserLabel").textContent = val;
+      return val;
+    }
+
+    function logApi(status, data) {
+      document.getElementById("httpBadge").textContent = `HTTP ${status}`;
+      document.getElementById("apiLog").textContent = JSON.stringify(data, null, 2);
+    }
+
+    function renderCatalog() {
+      const grid = document.getElementById("catalogGrid");
+      grid.innerHTML = PRODUCTS.map(p => `
+        <div class="bg-slate-950 border border-slate-800 rounded-lg p-3.5 flex items-center justify-between gap-3">
+          <div>
+            <span class="text-[11px] text-slate-400">${p.tag}</span>
+            <h3 class="font-medium text-sm text-slate-100">${p.name}</h3>
+            <p class="text-xs text-rose-400 font-semibold mt-0.5">${p.price}</p>
+          </div>
+          <button onclick="addToCart('${p.name}')"
+            class="bg-rose-600 hover:bg-rose-500 text-white text-xs font-medium px-3 py-2 rounded-lg shrink-0 transition">
+            + Agregar
+          </button>
+        </div>
+      `).join("");
+    }
+
+    async function addToCart(productName) {
+      const userId = getUserId();
+      try {
+        const res = await fetch(`/api/cart/${encodeURIComponent(userId)}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ productName, quantity: 1 })
+        });
+        const data = await res.json();
+        logApi(res.status, data);
+        await Promise.all([loadCart(), loadRanking()]);
+      } catch (err) {
+        logApi("ERR", { error: err.message });
+      }
+    }
+
+    async function loadCart() {
+      const userId = getUserId();
+      const container = document.getElementById("cartItems");
+      const ttlLabel = document.getElementById("cartTtl");
+      try {
+        const res = await fetch(`/api/cart/${encodeURIComponent(userId)}`);
+        const data = await res.json();
+
+        const rawItems = data.cart || data.items || (typeof data === "object" && !Array.isArray(data) ? data : {});
+        const ttl = data.ttl ?? data.ttlSeconds ?? data.expiresIn ?? null;
+        ttlLabel.textContent = ttl !== null ? `${ttl}s` : "Activo (24h)";
+
+        const entries = Object.entries(rawItems).filter(([k]) => !["ttl", "ttlSeconds", "userId", "message", "status"].includes(k));
+
+        if (entries.length === 0) {
+          container.innerHTML = `<p class="text-slate-500 py-4 text-center">El carrito está vacío.</p>`;
+          return;
+        }
+
+        container.innerHTML = entries.map(([product, qty]) => `
+          <div class="py-2.5 flex items-center justify-between gap-2">
+            <div>
+              <p class="font-medium text-slate-200">${product}</p>
+              <p class="text-xs text-slate-400">Cantidad en Hash: <span class="text-slate-200 font-mono">${qty}</span></p>
+            </div>
+            <button onclick="removeItem('${product.replace(/'/g, "\\'")}')"
+              class="text-xs text-rose-400 hover:text-rose-300 px-2 py-1 rounded border border-rose-900/60 hover:bg-rose-950/50 transition">
+              Quitar (HDEL)
+            </button>
+          </div>
+        `).join("");
+      } catch (err) {
+        container.innerHTML = `<p class="text-rose-400 py-4 text-center">Error al cargar carrito: ${err.message}</p>`;
+      }
+    }
+
+    async function removeItem(productName) {
+      const userId = getUserId();
+      try {
+        const res = await fetch(`/api/cart/${encodeURIComponent(userId)}/${encodeURIComponent(productName)}`, {
+          method: "DELETE"
+        });
+        const data = await res.json();
+        logApi(res.status, data);
+        await loadCart();
+      } catch (err) {
+        logApi("ERR", { error: err.message });
+      }
+    }
+
+    async function clearCart() {
+      const userId = getUserId();
+      try {
+        const res = await fetch(`/api/cart/${encodeURIComponent(userId)}`, {
+          method: "DELETE"
+        });
+        const data = await res.json();
+        logApi(res.status, data);
+        await loadCart();
+      } catch (err) {
+        logApi("ERR", { error: err.message });
+      }
+    }
+
+    async function loadRanking() {
+      const list = document.getElementById("rankingList");
+      try {
+        const res = await fetch("/api/ranking");
+        const data = await res.json();
+        const items = Array.isArray(data) ? data : (data.ranking || data.products || []);
+
+        if (!items.length) {
+          list.innerHTML = `<li class="text-slate-500 text-xs">Aún no hay productos rankeados.</li>`;
+          return;
+        }
+
+        // Soporta tanto [{value, score}] / [{product, score}] como arreglo plano ["Monitor", "3", ...]
+        const normalized = [];
+        if (typeof items[0] === "string") {
+          for (let i = 0; i < items.length; i += 2) {
+            normalized.push({ name: items[i], score: items[i + 1] ?? 0 });
+          }
+        } else {
+          for (const item of items) {
+            normalized.push({
+              name: item.product || item.productName || item.value || item.member || JSON.stringify(item),
+              score: item.score ?? item.ventas ?? item.count ?? 0
+            });
+          }
+        }
+
+        list.innerHTML = normalized.map((item, idx) => `
+          <li class="flex items-center justify-between bg-slate-950 border border-slate-800 rounded-lg px-3 py-2">
+            <div class="flex items-center gap-2.5">
+              <span class="w-5 h-5 rounded-full bg-sky-950 text-sky-400 border border-sky-800 text-xs font-bold flex items-center justify-center">
+                ${idx + 1}
+              </span>
+              <span class="text-slate-200 font-medium">${item.name}</span>
+            </div>
+            <span class="text-xs font-mono text-sky-400">${item.score} pts</span>
+          </li>
+        `).join("");
+      } catch (err) {
+        list.innerHTML = `<li class="text-rose-400 text-xs">Error en ranking: ${err.message}</li>`;
+      }
+    }
+
+    async function createSession() {
+      const token = document.getElementById("sessionToken").value.trim() || "token_abc123";
+      const ttlSeconds = Number(document.getElementById("sessionTtl").value) || 25;
+      const userId = getUserId();
+
+      try {
+        const res = await fetch("/api/session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token, userId, ttlSeconds })
+        });
+        const data = await res.json();
+        logApi(res.status, data);
+        await checkSession();
+
+        if (sessionPollTimer) clearInterval(sessionPollTimer);
+        sessionPollTimer = setInterval(checkSession, 3000);
+      } catch (err) {
+        logApi("ERR", { error: err.message });
+      }
+    }
+
+    async function checkSession() {
+      const token = document.getElementById("sessionToken").value.trim() || "token_abc123";
+      const box = document.getElementById("sessionStatus");
+      try {
+        const res = await fetch(`/api/session/${encodeURIComponent(token)}`);
+        const data = await res.json();
+        logApi(res.status, data);
+
+        if (!res.ok) {
+          box.innerHTML = `<span class="text-rose-400 font-semibold">EXPIRADA / INEXISTENTE</span><br/>${data.message || data.error || "Clave eliminada por TTL en Redis"}`;
+          if (sessionPollTimer) clearInterval(sessionPollTimer);
+          return;
+        }
+
+        const ttl = data.ttl ?? data.ttlSeconds ?? data.remainingTTL ?? "Activo";
+        box.innerHTML = `<span class="text-emerald-400 font-semibold">SESIÓN ACTIVA</span> | TTL: <span class="text-amber-400">${ttl}s</span><br/><span class="text-slate-400">${JSON.stringify(data.session || data)}</span>`;
+      } catch (err) {
+        box.innerHTML = `<span class="text-rose-400">Error: ${err.message}</span>`;
+      }
+    }
+
+    function refreshAll() {
+      loadCart();
+      loadRanking();
+    }
+
+    renderCatalog();
+    refreshAll();
+  </script>
+</body>
+</html>
