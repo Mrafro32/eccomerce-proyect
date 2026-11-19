@@ -8,9 +8,10 @@ async function seedDatabase() {
 
     //llenar el catalogo basico de productos
     const products = [
-      { id: 'prod:101', name: 'Teclado Mecanico RGB', price: 85 },
-      { id: 'prod:102', name: 'Mouse Inalambrico Pro', price: 45 },
-      { id: 'prod:103', name: 'Monitor de 144Hz', price: 290 }
+      { id: 'prod:101', name: 'Teclado Mecanico RGB', price: 1450 },
+      { id: 'prod:102', name: 'Mouse Inalambrico Pro', price: 1100 },
+      { id: 'prod:103', name: 'Monitor de 144Hz', price: 4500 },
+      { id: 'prod:103', name: 'SSD NVMe', price: 1690 },
     ];
 
     for (const prod of products) {
